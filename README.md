@@ -69,4 +69,3 @@ npm run dev
 - **Start**: `npm start`
 
 After deploy, open the Railway domain; the server will serve the SPA and REST APIs from the same origin.
-
