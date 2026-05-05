@@ -1,0 +1,17 @@
+{
+  "name": "team-task-manager",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm -w server run dev\" \"npm -w client run dev\"",
+    "build": "npm -w client run build && npm -w server run build",
+    "start": "npm -w server run start:prod"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
+
