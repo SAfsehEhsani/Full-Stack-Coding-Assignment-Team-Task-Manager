@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/http";
 import type { Task, User } from "../types";
 
@@ -51,6 +52,41 @@ export function DashboardPage() {
 
       {loading ? <div className="muted">Loading dashboard...</div> : null}
       {err ? <div style={{ color: "#ffb4b4" }}>{err}</div> : null}
+
+      <div className="grid two" style={{ marginTop: 12 }}>
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Start here</h3>
+          <div className="muted" style={{ marginBottom: 10 }}>
+            Roles are project-based: creating a project makes you <b>ADMIN</b>. If an Admin adds you to a project, you are a <b>MEMBER</b>.
+          </div>
+          <div className="row">
+            <Link to="/projects" className="btn primary" style={{ display: "inline-block" }}>
+              Create project (Admin)
+            </Link>
+            <Link to="/projects" className="btn" style={{ display: "inline-block" }}>
+              View / join projects (Member)
+            </Link>
+          </div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>
+            To join a project as Member, ask the Admin to add your email in the project’s Team section.
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Quick actions</h3>
+          <div className="row">
+            <Link to="/projects" className="btn primary" style={{ display: "inline-block" }}>
+              Open Projects
+            </Link>
+            <Link to="/dashboard" className="btn" style={{ display: "inline-block" }}>
+              Refresh Dashboard
+            </Link>
+          </div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>
+            Tip: click any task below to open its project and manage it.
+          </div>
+        </div>
+      </div>
 
       {data ? (
         <div className="grid two">
@@ -109,6 +145,9 @@ export function DashboardPage() {
                           {t.project?.name ?? "Project"} • due {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}
                         </div>
                       </div>
+                      <Link to={`/projects/${t.project?.id}`} className="btn">
+                        Open
+                      </Link>
                       <div className="pill">
                         <span className={`status ${overdue ? "overdue" : statusDot(t.status)}`} /> {t.status}
                       </div>
@@ -135,6 +174,9 @@ export function DashboardPage() {
                       {t.project?.name ?? "Project"} • {t.dueDate ? `due ${new Date(t.dueDate).toLocaleDateString()}` : "no due date"}
                     </div>
                   </div>
+                  <Link to={`/projects/${t.project?.id}`} className="btn">
+                    Open
+                  </Link>
                   <div className="pill">
                     <span className={`status ${statusDot(t.status)}`} /> {t.status}
                   </div>
