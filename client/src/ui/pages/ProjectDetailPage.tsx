@@ -25,6 +25,11 @@ export function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  const [q, setQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"ALL" | TaskStatus>("ALL");
+  const [filterAssignee, setFilterAssignee] = useState<"ALL" | "UNASSIGNED" | string>("ALL");
+  const [overdueOnly, setOverdueOnly] = useState(false);
+
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -200,6 +205,25 @@ export function ProjectDetailPage() {
   }
 
   const now = useMemo(() => new Date(), []);
+  const visibleTasks = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return tasks.filter((t) => {
+      if (filterStatus !== "ALL" && t.status !== filterStatus) return false;
+      if (filterAssignee === "UNASSIGNED" && t.assignedTo) return false;
+      if (filterAssignee !== "ALL" && filterAssignee !== "UNASSIGNED") {
+        if ((t.assignedTo?.id ?? "") !== filterAssignee) return false;
+      }
+      if (overdueOnly) {
+        const overdue = t.dueDate ? new Date(t.dueDate) < now && t.status !== "DONE" : false;
+        if (!overdue) return false;
+      }
+      if (query) {
+        const hay = `${t.title}\n${t.description ?? ""}\n${t.assignedTo?.name ?? ""}\n${t.assignedTo?.email ?? ""}`.toLowerCase();
+        if (!hay.includes(query)) return false;
+      }
+      return true;
+    });
+  }, [tasks, q, filterStatus, filterAssignee, overdueOnly, now]);
 
   return (
     <div className="container">
@@ -208,7 +232,7 @@ export function ProjectDetailPage() {
           ← Projects
         </Link>
         <h2 style={{ margin: 0 }}>{project?.name ?? "Project"}</h2>
-        <div className="pill">{role}</div>
+        <div className="pill">Role: {role}</div>
       </div>
 
       {loading ? <div className="muted">Loading...</div> : null}
@@ -324,10 +348,69 @@ export function ProjectDetailPage() {
       ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
-        <h3 style={{ marginTop: 0 }}>Tasks</h3>
-        {tasks.length === 0 ? <div className="muted">No tasks yet.</div> : null}
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <h3 style={{ marginTop: 0, marginBottom: 0 }}>Tasks</h3>
+          <div className="pill">{visibleTasks.length} shown</div>
+        </div>
+
+        <div className="grid two" style={{ marginTop: 10 }}>
+          <div className="grid" style={{ gap: 6 }}>
+            <div className="muted">Search</div>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title, description, assignee..." />
+          </div>
+          <div className="grid two">
+            <div className="grid" style={{ gap: 6 }}>
+              <div className="muted">Status</div>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
+                <option value="ALL">ALL</option>
+                <option value="TODO">TODO</option>
+                <option value="IN_PROGRESS">IN_PROGRESS</option>
+                <option value="DONE">DONE</option>
+              </select>
+            </div>
+            <div className="grid" style={{ gap: 6 }}>
+              <div className="muted">Assignee</div>
+              <select value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}>
+                <option value="ALL">ALL</option>
+                <option value="UNASSIGNED">UNASSIGNED</option>
+                {memberUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="row" style={{ marginTop: 10 }}>
+          <label className="pill" style={{ cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={overdueOnly}
+              onChange={(e) => setOverdueOnly(e.target.checked)}
+              style={{ width: 16, height: 16 }}
+            />
+            Overdue only
+          </label>
+          {(q || filterStatus !== "ALL" || filterAssignee !== "ALL" || overdueOnly) ? (
+            <button
+              className="btn"
+              onClick={() => {
+                setQ("");
+                setFilterStatus("ALL");
+                setFilterAssignee("ALL");
+                setOverdueOnly(false);
+              }}
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+
+        {visibleTasks.length === 0 ? <div className="muted" style={{ marginTop: 10 }}>No tasks match these filters.</div> : null}
         <div className="grid" style={{ gap: 10 }}>
-          {tasks.map((t) => {
+          {visibleTasks.map((t) => {
             const overdue = t.dueDate ? new Date(t.dueDate) < now && t.status !== "DONE" : false;
             const isEditing = editingTaskId === t.id;
             return (

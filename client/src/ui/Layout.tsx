@@ -1,9 +1,23 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearToken, getToken } from "./auth/token";
+import { api } from "./api/http";
+import type { User } from "./types";
 
 export function Layout() {
   const navigate = useNavigate();
   const authed = Boolean(getToken());
+  const [me, setMe] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (!authed) {
+      setMe(null);
+      return;
+    }
+    api<{ user: User | null }>("/api/auth/me")
+      .then((res) => setMe(res.user ?? null))
+      .catch(() => setMe(null));
+  }, [authed]);
 
   return (
     <div>
@@ -15,6 +29,11 @@ export function Layout() {
           <div style={{ flex: 1 }} />
           {authed ? (
             <div className="row">
+              {me ? (
+                <div className="pill" title={me.email}>
+                  Signed in as <b>{me.name}</b>
+                </div>
+              ) : null}
               <NavLink to="/dashboard" className="pill">
                 Dashboard
               </NavLink>
