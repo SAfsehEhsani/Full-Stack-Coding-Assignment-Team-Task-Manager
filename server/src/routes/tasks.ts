@@ -141,3 +141,19 @@ tasksRouter.patch("/:taskId", requireAuth, requireProjectMember, async (req: Aut
   return res.json({ task });
 });
 
+tasksRouter.delete("/:taskId", requireAuth, requireProjectMember, async (req: AuthedRequest, res) => {
+  const projectId = firstParam(req.params.projectId);
+  if (!projectId) return res.status(400).json({ error: "Missing projectId" });
+  const taskId = firstParam(req.params.taskId);
+  if (!taskId) return res.status(400).json({ error: "Missing taskId" });
+
+  const membership = (req as any).membership as { role: ProjectRole } | undefined;
+  if (membership?.role !== ProjectRole.ADMIN) return res.status(403).json({ error: "Admin only" });
+
+  const existing = await prisma.task.findFirst({ where: { id: taskId, projectId }, select: { id: true } });
+  if (!existing) return res.status(404).json({ error: "Task not found" });
+
+  await prisma.task.delete({ where: { id: taskId } });
+  return res.status(204).send();
+});
+

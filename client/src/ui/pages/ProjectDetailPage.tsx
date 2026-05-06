@@ -25,6 +25,13 @@ export function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editAssignedToId, setEditAssignedToId] = useState("");
+  const [editPriority, setEditPriority] = useState<TaskPriority>("MEDIUM");
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -91,7 +98,14 @@ export function ProjectDetailPage() {
 
   async function updateTask(
     taskId: string,
-    patch: Partial<{ status: TaskStatus; assignedToId: string | null; priority: TaskPriority }>
+    patch: Partial<{
+      status: TaskStatus;
+      assignedToId: string | null;
+      priority: TaskPriority;
+      title: string;
+      description: string | null;
+      dueDate: string | null;
+    }>
   ) {
     if (!projectId) return;
     setErr(null);
@@ -103,6 +117,39 @@ export function ProjectDetailPage() {
       await load();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to update task");
+    }
+  }
+
+  function startEditTask(t: Task) {
+    setEditingTaskId(t.id);
+    setEditTitle(t.title);
+    setEditDescription(t.description ?? "");
+    setEditPriority(t.priority);
+    setEditAssignedToId(t.assignedTo?.id ?? "");
+    setEditDueDate(t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 10) : "");
+  }
+
+  async function saveEditTask(taskId: string) {
+    const patch = {
+      title: editTitle,
+      description: editDescription ? editDescription : null,
+      priority: editPriority,
+      assignedToId: editAssignedToId ? editAssignedToId : null,
+      dueDate: editDueDate ? new Date(editDueDate).toISOString() : null
+    };
+    await updateTask(taskId, patch);
+    setEditingTaskId(null);
+  }
+
+  async function deleteTask(taskId: string) {
+    if (!projectId) return;
+    if (!confirm("Delete this task?")) return;
+    setErr(null);
+    try {
+      await api(`/api/projects/${projectId}/tasks/${taskId}`, { method: "DELETE" });
+      await load();
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to delete task");
     }
   }
 
@@ -282,6 +329,7 @@ export function ProjectDetailPage() {
         <div className="grid" style={{ gap: 10 }}>
           {tasks.map((t) => {
             const overdue = t.dueDate ? new Date(t.dueDate) < now && t.status !== "DONE" : false;
+            const isEditing = editingTaskId === t.id;
             return (
               <div key={t.id} className="card" style={{ padding: 12 }}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
@@ -330,11 +378,70 @@ export function ProjectDetailPage() {
                           ))}
                         </select>
                       </div>
+                      <div className="row">
+                        {isEditing ? (
+                          <>
+                            <button className="btn primary" onClick={() => saveEditTask(t.id)} disabled={!editTitle}>
+                              Save
+                            </button>
+                            <button className="btn" onClick={() => setEditingTaskId(null)}>
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn" onClick={() => startEditTask(t)}>
+                              Edit
+                            </button>
+                            <button className="btn danger" onClick={() => deleteTask(t.id)}>
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <div className="pill">Priority: {t.priority}</div>
                   )}
                 </div>
+
+                {role === "ADMIN" && isEditing ? (
+                  <div className="grid" style={{ gap: 10, marginTop: 10 }}>
+                    <div className="grid" style={{ gap: 6 }}>
+                      <div className="muted">Title</div>
+                      <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                    </div>
+                    <div className="grid" style={{ gap: 6 }}>
+                      <div className="muted">Description</div>
+                      <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
+                    </div>
+                    <div className="grid two">
+                      <div className="grid" style={{ gap: 6 }}>
+                        <div className="muted">Due date</div>
+                        <input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+                      </div>
+                      <div className="grid" style={{ gap: 6 }}>
+                        <div className="muted">Assign to</div>
+                        <select value={editAssignedToId} onChange={(e) => setEditAssignedToId(e.target.value)}>
+                          <option value="">Unassigned</option>
+                          {memberUsers.map((u: User) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.email})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid" style={{ gap: 6 }}>
+                      <div className="muted">Priority</div>
+                      <select value={editPriority} onChange={(e) => setEditPriority(e.target.value as TaskPriority)}>
+                        <option value="LOW">LOW</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="HIGH">HIGH</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             );
           })}

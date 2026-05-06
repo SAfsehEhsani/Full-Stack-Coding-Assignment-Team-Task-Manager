@@ -122,16 +122,20 @@ projectsRouter.patch(
   requireProjectMember,
   requireProjectAdmin,
   async (req, res) => {
+    const projectId = firstParam(req.params.id);
+    if (!projectId) return res.status(400).json({ error: "Missing projectId" });
     const memberId = firstParam(req.params.memberId);
     if (!memberId) return res.status(400).json({ error: "Missing memberId" });
     const RoleSchema = z.object({ role: z.nativeEnum(ProjectRole) });
     const parsed = RoleSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
 
-    const member = await prisma.projectMember.update({
-      where: { id: memberId },
+    const updated = await prisma.projectMember.updateMany({
+      where: { id: memberId, projectId },
       data: { role: parsed.data.role }
     });
+    if (updated.count === 0) return res.status(404).json({ error: "Member not found" });
+    const member = await prisma.projectMember.findUnique({ where: { id: memberId } });
     return res.json({ member });
   }
 );
@@ -142,9 +146,12 @@ projectsRouter.delete(
   requireProjectMember,
   requireProjectAdmin,
   async (req, res) => {
+    const projectId = firstParam(req.params.id);
+    if (!projectId) return res.status(400).json({ error: "Missing projectId" });
     const memberId = firstParam(req.params.memberId);
     if (!memberId) return res.status(400).json({ error: "Missing memberId" });
-    await prisma.projectMember.delete({ where: { id: memberId } });
+    const deleted = await prisma.projectMember.deleteMany({ where: { id: memberId, projectId } });
+    if (deleted.count === 0) return res.status(404).json({ error: "Member not found" });
     return res.status(204).send();
   }
 );
