@@ -39,7 +39,7 @@ const __dirname = path.dirname(__filename);
 const clientDist = path.resolve(__dirname, "../../client/dist");
 
 app.use(express.static(clientDist));
-app.get("*", (req, res) => {
+app.get(/.*/, (req, res) => {
   if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found" });
   return res.sendFile(path.join(clientDist, "index.html"));
 });
