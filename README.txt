@@ -18,7 +18,7 @@ GitHub repository:
 
 WHAT THIS APP IS
 ----------------
-This is a simple Team Task Management web app (like a mini Trello/Asana).
+This is a simple Team Task Management web app.
 Users can:
   - signup/login
   - create projects and work in teams
@@ -169,7 +169,7 @@ Plus one PostgreSQL database.
    - Open client URL and test signup/login
 
 
-HOW THIS MATCHES THE ASSIGNMENT REQUIREMENTS (CHECKLIST)
+ASSIGNMENT REQUIREMENTS (CHECKLIST)
 --------------------------------------------------------
 
 1) User Authentication
@@ -202,7 +202,7 @@ Backend & Database Requirements
    - RESTful APIs: YES
    - Database: YES (Postgres)
    - Proper relationships (Users, Projects, Tasks): YES
-   - Validations and error handling: YES (zod + HTTP errors)
+   - Validations and error handling: YES 
 
 
 NOTES / IMPORTANT DETAILS
