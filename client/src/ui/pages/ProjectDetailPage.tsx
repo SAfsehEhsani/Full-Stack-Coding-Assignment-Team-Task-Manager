@@ -37,6 +37,8 @@ export function ProjectDetailPage() {
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
@@ -246,6 +248,29 @@ export function ProjectDetailPage() {
     });
   }, [tasks, q, filterStatus, filterAssignee, overdueOnly, now]);
 
+  const memberReport = useMemo(() => {
+    if (role !== "ADMIN") return [];
+    const byUser = new Map<string, { user: User; total: number; overdue: number; done: number }>();
+    for (const m of members) {
+      byUser.set(m.user.id, { user: m.user, total: 0, overdue: 0, done: 0 });
+    }
+    for (const t of tasks) {
+      if (!t.assignedTo) continue;
+      const row = byUser.get(t.assignedTo.id);
+      if (!row) continue;
+      row.total += 1;
+      if (t.status === "DONE") row.done += 1;
+      const overdue = t.dueDate ? new Date(t.dueDate) < now && t.status !== "DONE" : false;
+      if (overdue) row.overdue += 1;
+    }
+    return Array.from(byUser.values()).sort((a, b) => b.total - a.total);
+  }, [role, members, tasks, now]);
+
+  function openDetails(t: Task) {
+    setDetailTask(t);
+    setDetailOpen(true);
+  }
+
   return (
     <div className="container">
       <div className="row" style={{ marginTop: 18, marginBottom: 12 }}>
@@ -337,6 +362,49 @@ export function ProjectDetailPage() {
         </div>
       ) : null}
 
+      {role === "ADMIN" ? (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h3 style={{ marginTop: 0, marginBottom: 0 }}>Members report</h3>
+            <div className="muted" style={{ fontSize: 13 }}>
+              Click a member to quickly filter tasks.
+            </div>
+          </div>
+          <div className="grid" style={{ gap: 10, marginTop: 10 }}>
+            {memberReport.map((r) => (
+              <button
+                key={r.user.id}
+                className="card hoverable"
+                style={{ padding: 12, textAlign: "left", cursor: "pointer" }}
+                onClick={() => {
+                  setFilterAssignee(r.user.id);
+                  toast.push("info", `Filtering tasks for ${r.user.name}`);
+                  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+                }}
+              >
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontWeight: 750 }}>{r.user.name}</div>
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      {r.user.email}
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="pill">{r.total} total</div>
+                    <div className="pill">
+                      <span className="status done" /> {r.done} done
+                    </div>
+                    <div className="pill">
+                      <span className="status overdue" /> {r.overdue} overdue
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="card" style={{ marginTop: 12 }}>
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h3 style={{ marginTop: 0, marginBottom: 0 }}>Tasks</h3>
@@ -403,15 +471,27 @@ export function ProjectDetailPage() {
           {visibleTasks.map((t) => {
             const overdue = t.dueDate ? new Date(t.dueDate) < now && t.status !== "DONE" : false;
             return (
-              <div key={t.id} className="card" style={{ padding: 12 }}>
+              <div key={t.id} className="card hoverable" style={{ padding: 12 }}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{t.title}</div>
+                  <button
+                    className="btn"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      textAlign: "left",
+                      cursor: "pointer",
+                      flex: 1
+                    }}
+                    onClick={() => openDetails(t)}
+                    title="Click to view details"
+                  >
+                    <div style={{ fontWeight: 800 }}>{t.title}</div>
                     <div className="muted" style={{ fontSize: 13 }}>
                       {t.assignedTo ? `Assigned to ${t.assignedTo.name}` : "Unassigned"} •{" "}
                       {t.dueDate ? `Due ${new Date(t.dueDate).toLocaleDateString()}` : "No due date"}
                     </div>
-                  </div>
+                  </button>
                   <div className="pill">
                     <span className={`status ${overdue ? "overdue" : statusDot(t.status)}`} /> {statusLabel(t.status)}
                   </div>
@@ -590,6 +670,58 @@ export function ProjectDetailPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={detailOpen}
+        title="Task details"
+        onClose={() => {
+          setDetailOpen(false);
+          setDetailTask(null);
+        }}
+      >
+        {detailTask ? (
+          <div className="grid" style={{ gap: 10 }}>
+            <div>
+              <div className="muted">Title</div>
+              <div style={{ fontWeight: 850 }}>{detailTask.title}</div>
+            </div>
+            <div className="grid two">
+              <div>
+                <div className="muted">Status</div>
+                <div className="pill">
+                  <span className={`status ${statusDot(detailTask.status)}`} /> {detailTask.status}
+                </div>
+              </div>
+              <div>
+                <div className="muted">Priority</div>
+                <div className="pill">{detailTask.priority}</div>
+              </div>
+            </div>
+            <div className="grid two">
+              <div>
+                <div className="muted">Assigned to</div>
+                <div className="pill">{detailTask.assignedTo ? `${detailTask.assignedTo.name} (${detailTask.assignedTo.email})` : "Unassigned"}</div>
+              </div>
+              <div>
+                <div className="muted">Due date</div>
+                <div className="pill">
+                  {detailTask.dueDate ? new Date(detailTask.dueDate).toLocaleDateString() : "No due date"}
+                </div>
+              </div>
+            </div>
+            <div>
+              <div className="muted">Description</div>
+              <div className="card" style={{ padding: 12 }}>
+                {detailTask.description ? detailTask.description : <span className="muted">No description</span>}
+              </div>
+            </div>
+            <div className="muted" style={{ fontSize: 13 }}>
+              Created at: {new Date(detailTask.createdAt).toLocaleString()} • Updated at:{" "}
+              {new Date(detailTask.updatedAt).toLocaleString()}
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );
