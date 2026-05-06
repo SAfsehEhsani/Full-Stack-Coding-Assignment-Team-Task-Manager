@@ -81,7 +81,7 @@ export function ProjectsPage() {
 
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Your projects</h3>
-          {loading ? <div className="muted">Loading...</div> : null}
+          {loading ? <div className="muted">Loading projects...</div> : null}
           {!loading && projects.length === 0 ? <div className="muted">No projects yet.</div> : null}
           <div className="grid" style={{ gap: 10 }}>
             {projects.map((p) => (

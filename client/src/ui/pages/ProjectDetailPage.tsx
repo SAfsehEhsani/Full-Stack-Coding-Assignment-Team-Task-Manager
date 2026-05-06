@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/http";
 import type { Project, ProjectMember, ProjectRole, Task, TaskPriority, TaskStatus, User } from "../types";
+import { Modal } from "../components/Modal";
+import { useToast } from "../components/Toast";
 
 type ProjectResponse = { project: Project; membership: { role: ProjectRole } };
 
@@ -19,6 +21,7 @@ function statusDot(status: TaskStatus) {
 
 export function ProjectDetailPage() {
   const { projectId } = useParams();
+  const toast = useToast();
   const [project, setProject] = useState<Project | null>(null);
   const [role, setRole] = useState<ProjectRole>("MEMBER");
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -30,7 +33,10 @@ export function ProjectDetailPage() {
   const [filterAssignee, setFilterAssignee] = useState<"ALL" | "UNASSIGNED" | string>("ALL");
   const [overdueOnly, setOverdueOnly] = useState(false);
 
+  const [createOpen, setCreateOpen] = useState(false);
+
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
@@ -94,8 +100,11 @@ export function ProjectDetailPage() {
       setAssignedToId("");
       setPriority("MEDIUM");
       await load();
+      setCreateOpen(false);
+      toast.push("success", "Task created");
     } catch (e: any) {
       setErr(e?.message ?? "Failed to create task");
+      toast.push("error", e?.message ?? "Failed to create task");
     } finally {
       setCreating(false);
     }
@@ -120,8 +129,10 @@ export function ProjectDetailPage() {
         body: JSON.stringify(patch)
       });
       await load();
+      toast.push("success", "Task updated");
     } catch (e: any) {
       setErr(e?.message ?? "Failed to update task");
+      toast.push("error", e?.message ?? "Failed to update task");
     }
   }
 
@@ -132,6 +143,7 @@ export function ProjectDetailPage() {
     setEditPriority(t.priority);
     setEditAssignedToId(t.assignedTo?.id ?? "");
     setEditDueDate(t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 10) : "");
+    setEditOpen(true);
   }
 
   async function saveEditTask(taskId: string) {
@@ -144,6 +156,7 @@ export function ProjectDetailPage() {
     };
     await updateTask(taskId, patch);
     setEditingTaskId(null);
+    setEditOpen(false);
   }
 
   async function deleteTask(taskId: string) {
@@ -153,8 +166,10 @@ export function ProjectDetailPage() {
     try {
       await api(`/api/projects/${projectId}/tasks/${taskId}`, { method: "DELETE" });
       await load();
+      toast.push("success", "Task deleted");
     } catch (e: any) {
       setErr(e?.message ?? "Failed to delete task");
+      toast.push("error", e?.message ?? "Failed to delete task");
     }
   }
 
@@ -171,8 +186,10 @@ export function ProjectDetailPage() {
       setInviteEmail("");
       setInviteRole("MEMBER");
       await load();
+      toast.push("success", "Member added");
     } catch (e: any) {
       setErr(e?.message ?? "Failed to add member");
+      toast.push("error", e?.message ?? "Failed to add member");
     } finally {
       setInviting(false);
     }
@@ -185,8 +202,10 @@ export function ProjectDetailPage() {
     try {
       await api(`/api/projects/${projectId}/members/${member.id}`, { method: "DELETE" });
       await load();
+      toast.push("success", "Member removed");
     } catch (e: any) {
       setErr(e?.message ?? "Failed to remove member");
+      toast.push("error", e?.message ?? "Failed to remove member");
     }
   }
 
@@ -199,8 +218,10 @@ export function ProjectDetailPage() {
         body: JSON.stringify({ role: newRole })
       });
       await load();
+      toast.push("success", "Role updated");
     } catch (e: any) {
       setErr(e?.message ?? "Failed to update role");
+      toast.push("error", e?.message ?? "Failed to update role");
     }
   }
 
@@ -241,50 +262,19 @@ export function ProjectDetailPage() {
       {project ? (
         <div className="grid two">
           <div className="card">
-            <h3 style={{ marginTop: 0 }}>Create task</h3>
-            {role !== "ADMIN" ? (
-              <div className="muted">Only Admins can create tasks.</div>
-            ) : null}
-            <form onSubmit={onCreateTask} className="grid" style={{ gap: 10, opacity: role === "ADMIN" ? 1 : 0.6 }}>
-              <div className="grid" style={{ gap: 6 }}>
-                <div className="muted">Title</div>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Design login page" />
-              </div>
-              <div className="grid" style={{ gap: 6 }}>
-                <div className="muted">Description</div>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
-              </div>
-              <div className="grid two">
-                <div className="grid" style={{ gap: 6 }}>
-                  <div className="muted">Due date</div>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                </div>
-                <div className="grid" style={{ gap: 6 }}>
-                  <div className="muted">Assign to</div>
-                  <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)}>
-                    <option value="">Unassigned</option>
-                    {memberUsers.map((u: User) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.email})
-                      </option>
-                    ))}
-                  </select>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 6 }}>Tasks</h3>
+                <div className="muted" style={{ fontSize: 13 }}>
+                  {role === "ADMIN" ? "Create, assign, edit, and delete tasks." : "You can update status on tasks assigned to you."}
                 </div>
               </div>
-
-              <div className="grid" style={{ gap: 6 }}>
-                <div className="muted">Priority</div>
-                <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}>
-                  <option value="LOW">LOW</option>
-                  <option value="MEDIUM">MEDIUM</option>
-                  <option value="HIGH">HIGH</option>
-                </select>
-              </div>
-
-              <button className="btn primary" disabled={role !== "ADMIN" || !title || creating}>
-                {creating ? "Creating..." : "Create task"}
-              </button>
-            </form>
+              {role === "ADMIN" ? (
+                <button className="btn primary" onClick={() => setCreateOpen(true)}>
+                  + New task
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="card">
@@ -412,7 +402,6 @@ export function ProjectDetailPage() {
         <div className="grid" style={{ gap: 10 }}>
           {visibleTasks.map((t) => {
             const overdue = t.dueDate ? new Date(t.dueDate) < now && t.status !== "DONE" : false;
-            const isEditing = editingTaskId === t.id;
             return (
               <div key={t.id} className="card" style={{ padding: 12 }}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
@@ -462,74 +451,146 @@ export function ProjectDetailPage() {
                         </select>
                       </div>
                       <div className="row">
-                        {isEditing ? (
-                          <>
-                            <button className="btn primary" onClick={() => saveEditTask(t.id)} disabled={!editTitle}>
-                              Save
-                            </button>
-                            <button className="btn" onClick={() => setEditingTaskId(null)}>
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button className="btn" onClick={() => startEditTask(t)}>
-                              Edit
-                            </button>
-                            <button className="btn danger" onClick={() => deleteTask(t.id)}>
-                              Delete
-                            </button>
-                          </>
-                        )}
+                        <button className="btn" onClick={() => startEditTask(t)}>
+                          Edit
+                        </button>
+                        <button className="btn danger" onClick={() => deleteTask(t.id)}>
+                          Delete
+                        </button>
                       </div>
                     </>
                   ) : (
                     <div className="pill">Priority: {t.priority}</div>
                   )}
                 </div>
-
-                {role === "ADMIN" && isEditing ? (
-                  <div className="grid" style={{ gap: 10, marginTop: 10 }}>
-                    <div className="grid" style={{ gap: 6 }}>
-                      <div className="muted">Title</div>
-                      <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                    </div>
-                    <div className="grid" style={{ gap: 6 }}>
-                      <div className="muted">Description</div>
-                      <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
-                    </div>
-                    <div className="grid two">
-                      <div className="grid" style={{ gap: 6 }}>
-                        <div className="muted">Due date</div>
-                        <input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
-                      </div>
-                      <div className="grid" style={{ gap: 6 }}>
-                        <div className="muted">Assign to</div>
-                        <select value={editAssignedToId} onChange={(e) => setEditAssignedToId(e.target.value)}>
-                          <option value="">Unassigned</option>
-                          {memberUsers.map((u: User) => (
-                            <option key={u.id} value={u.id}>
-                              {u.name} ({u.email})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid" style={{ gap: 6 }}>
-                      <div className="muted">Priority</div>
-                      <select value={editPriority} onChange={(e) => setEditPriority(e.target.value as TaskPriority)}>
-                        <option value="LOW">LOW</option>
-                        <option value="MEDIUM">MEDIUM</option>
-                        <option value="HIGH">HIGH</option>
-                      </select>
-                    </div>
-                  </div>
-                ) : null}
               </div>
             );
           })}
         </div>
       </div>
+
+      <Modal
+        open={createOpen}
+        title="Create task"
+        onClose={() => {
+          if (creating) return;
+          setCreateOpen(false);
+        }}
+      >
+        <form onSubmit={onCreateTask} className="grid" style={{ gap: 10 }}>
+          <div className="grid" style={{ gap: 6 }}>
+            <div className="muted">Title</div>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Design login page" />
+          </div>
+          <div className="grid" style={{ gap: 6 }}>
+            <div className="muted">Description</div>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          </div>
+          <div className="grid two">
+            <div className="grid" style={{ gap: 6 }}>
+              <div className="muted">Due date</div>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+            <div className="grid" style={{ gap: 6 }}>
+              <div className="muted">Assign to</div>
+              <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)}>
+                <option value="">Unassigned</option>
+                {memberUsers.map((u: User) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid" style={{ gap: 6 }}>
+            <div className="muted">Priority</div>
+            <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}>
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+            </select>
+          </div>
+
+          <div className="row" style={{ justifyContent: "flex-end" }}>
+            <button className="btn" type="button" onClick={() => setCreateOpen(false)} disabled={creating}>
+              Cancel
+            </button>
+            <button className="btn primary" disabled={!title || creating}>
+              {creating ? "Creating..." : "Create task"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={editOpen}
+        title="Edit task"
+        onClose={() => {
+          setEditOpen(false);
+          setEditingTaskId(null);
+        }}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!editingTaskId) return;
+            void saveEditTask(editingTaskId);
+          }}
+          className="grid"
+          style={{ gap: 10 }}
+        >
+          <div className="grid" style={{ gap: 6 }}>
+            <div className="muted">Title</div>
+            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+          </div>
+          <div className="grid" style={{ gap: 6 }}>
+            <div className="muted">Description</div>
+            <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
+          </div>
+          <div className="grid two">
+            <div className="grid" style={{ gap: 6 }}>
+              <div className="muted">Due date</div>
+              <input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+            </div>
+            <div className="grid" style={{ gap: 6 }}>
+              <div className="muted">Assign to</div>
+              <select value={editAssignedToId} onChange={(e) => setEditAssignedToId(e.target.value)}>
+                <option value="">Unassigned</option>
+                {memberUsers.map((u: User) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid" style={{ gap: 6 }}>
+            <div className="muted">Priority</div>
+            <select value={editPriority} onChange={(e) => setEditPriority(e.target.value as TaskPriority)}>
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+            </select>
+          </div>
+          <div className="row" style={{ justifyContent: "flex-end" }}>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => {
+                setEditOpen(false);
+                setEditingTaskId(null);
+              }}
+            >
+              Cancel
+            </button>
+            <button className="btn primary" disabled={!editingTaskId || !editTitle}>
+              Save changes
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

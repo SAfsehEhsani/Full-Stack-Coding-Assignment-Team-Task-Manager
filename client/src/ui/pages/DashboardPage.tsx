@@ -49,7 +49,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {loading ? <div className="muted">Loading...</div> : null}
+      {loading ? <div className="muted">Loading dashboard...</div> : null}
       {err ? <div style={{ color: "#ffb4b4" }}>{err}</div> : null}
 
       {data ? (
