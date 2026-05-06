@@ -4,7 +4,10 @@ export type ApiError = { error: string; details?: unknown };
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
-  const res = await fetch(path, {
+  const base = (import.meta as any).env?.VITE_API_BASE as string | undefined;
+  const url = base ? new URL(path, base).toString() : path;
+
+  const res = await fetch(url, {
     ...init,
     headers: {
       "content-type": "application/json",
